@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: cd646b2dc60e3fb459adc06060a88669
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 625f186215c104763be7675aa2d941aa, type: 3}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 183261
+  packageName: City Assets Volume 1 FREE
+  packageVersion: 1.0
+  assetPath: Assets/City Assets Volume 1 -FREE/Barrels/Materials/Barrels Parrent.shadergraph
+  uploadId: 401986

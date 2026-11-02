@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 133cd238b9763884f87747039834033d
+ScriptedImporter:
+  internalIDToNameTable: []
+  externalObjects: {}
+  serializedVersion: 2
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+  script: {fileID: 11500000, guid: 625f186215c104763be7675aa2d941aa, type: 3}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 183261
+  packageName: City Assets Volume 1 FREE
+  packageVersion: 1.0
+  assetPath: Assets/City Assets Volume 1 -FREE/Uphill/Material/Uphill Material Parent.shadergraph
+  uploadId: 401986

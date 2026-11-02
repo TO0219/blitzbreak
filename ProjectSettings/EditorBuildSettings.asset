@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/BootstrapScene.unity
+    guid: 901b778746c49b44ca9a1468f6a74ce0
+  - enabled: 1
+    path: Assets/Scenes/BattleScene.unity
+    guid: 83dc359352f5efb4aaa8d86f4b4cbb2a
+  - enabled: 1
+    path: Assets/Scenes/BattleUIScene.unity
+    guid: 99e2018c9de817043ba225d52f59909c
+  - enabled: 1
+    path: Assets/Scenes/BattlePauseUIScene.unity
+    guid: b17c4a8e2f20443d8a8d8991fa2f7d2e
+  - enabled: 1
+    path: Assets/Scenes/TitleScene.unity
+    guid: f7bfa76640d9a44468aa684a531c7816
+  - enabled: 1
+    path: Assets/Scenes/OptionScene.unity
+    guid: 58c7ec6cf997b1c448a9367b25aa0ad0
+  - enabled: 1
+    path: Assets/Scenes/VehicleSelectScene.unity
+    guid: 2c40fb0e0a6c4f76bbf46f8f3833d4ae
+  - enabled: 1
+    path: Assets/Scenes/LobbyScene.unity
+    guid: 3653de504a90f874c8f8018df461f237
+  - enabled: 1
+    path: Assets/Scenes/Load/LoadingScene.unity
+    guid: 1a5f0bd9d63054346add1c8fc7ef1136
+  - enabled: 1
+    path: Assets/Scenes/Result/ResultScene.unity
+    guid: d05a7bec2a45aec4881cf6b0d1e799e0
+  - enabled: 1
+    path: Assets/Scenes/Result/PlayerDetailScene.unity
+    guid: 4641191c960dd6542936b18b67697874
+  m_configObjects: {}

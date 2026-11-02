@@ -1,0 +1,19 @@
+fileFormatVersion: 2
+guid: 19287a6ab57e3b84e8b63724136b23fb
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - owner: {instanceID: 0}
+  - muzzleTransform: {instanceID: 0}
+  - cannonModelPrefab: {fileID: 919132149155446097, guid: 53fcd46aaa517e940b9b8c23193c4f94, type: 3}
+  - missileModelPrefab: {fileID: 6746073157883041829, guid: 5ccdbf092d32ce34588fe0a36707d435, type: 3}
+  - gatlingModelPrefab: {fileID: 7263655589133937923, guid: 147d1aab217365b4f9b331ac7292f46f, type: 3}
+  - cannonBulletPrefab: {instanceID: 0}
+  - missilePrefab: {fileID: 4946865931087352332, guid: 29b85fcb48ca872409e37eb01c9ea075, type: 3}
+  - gatlingBulletPrefab: {fileID: 5019009196460839063, guid: f90d731da83450e408023571f483af6f, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

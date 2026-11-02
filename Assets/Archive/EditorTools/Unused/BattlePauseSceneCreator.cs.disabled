@@ -1,0 +1,409 @@
+using System.IO;
+using MyGame;
+using TMPro;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+public static class BattlePauseSceneCreator
+{
+    private const string BattlePauseScenePath = "Assets/Scenes/BattlePauseUIScene.unity";
+    private const string OptionScenePath = "Assets/Scenes/OptionScene.unity";
+
+    [MenuItem("Tools/Battle UI/Create Pause And Option UI Scenes")]
+    public static void CreateScenesFromMenu()
+    {
+        CreateAllScenes();
+    }
+
+    [MenuItem("Tools/Battle UI/Create Battle Pause UI Scene")]
+    public static void CreatePauseSceneFromMenu()
+    {
+        CreatePauseScene();
+    }
+
+    [MenuItem("Tools/Battle UI/Create Option UI Scene")]
+    public static void CreateOptionSceneFromMenu()
+    {
+        CreateOptionScene();
+    }
+
+    public static void CreateSceneFromCommandLine()
+    {
+        CreateAllScenes();
+    }
+
+    public static void CreateAllScenesFromCommandLine()
+    {
+        CreateAllScenes();
+    }
+
+    public static void CreateAllScenes()
+    {
+        CreatePauseScene();
+        CreateOptionScene();
+    }
+
+    public static void CreatePauseScene()
+    {
+        CreateScene(BattlePauseScenePath, "BattlePauseCanvas", false);
+    }
+
+    public static void CreateOptionScene()
+    {
+        CreateScene(OptionScenePath, "OptionCanvas", true);
+    }
+
+    private static void CreateScene(string scenePath, string canvasName, bool optionSceneMode)
+    {
+        Directory.CreateDirectory("Assets/Scenes");
+
+        Scene previousScene = SceneManager.GetActiveScene();
+        Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        SceneManager.SetActiveScene(scene);
+
+        GameObject eventSystem = new GameObject("EventSystem");
+        eventSystem.AddComponent<EventSystem>();
+        eventSystem.AddComponent<InputSystemUIInputModule>();
+
+        GameObject canvasObject = new GameObject(canvasName, typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        Canvas canvas = canvasObject.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 500;
+
+        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.matchWidthOrHeight = 0.5f;
+
+        BattlePauseUIController controller = canvasObject.AddComponent<BattlePauseUIController>();
+
+        GameObject pauseRoot = CreatePanel("PauseRoot", canvasObject.transform, StretchFull, new Color(0f, 0f, 0f, 0.68f));
+        GameObject mainPanel = CreatePanel("MainPanel", pauseRoot.transform, CenterPanel(560f, 540f), new Color(0.06f, 0.07f, 0.09f, 0.96f));
+        GameObject optionPanel = CreatePanel("OptionPanel", pauseRoot.transform, CenterPanel(820f, 1010f), new Color(0.06f, 0.07f, 0.09f, 0.96f));
+
+        AddVerticalLayout(mainPanel, 28, 32, 32, 32, 20, TextAnchor.UpperCenter);
+        AddVerticalLayout(optionPanel, 26, 34, 18, 18, 8, TextAnchor.UpperCenter);
+
+        CreateText("Title", mainPanel.transform, "ポーズ", 56f, FontStyles.Bold, new Color(1f, 1f, 1f, 1f), new Vector2(500f, 80f));
+        Button resumeButton = CreateButton("ResumeButton", mainPanel.transform, "続ける", new Vector2(420f, 64f), new Color(0.12f, 0.55f, 0.34f, 1f));
+        Button optionButton = CreateButton("OptionButton", mainPanel.transform, "オプション", new Vector2(420f, 64f), new Color(0.16f, 0.22f, 0.32f, 1f));
+        Button titleButton = CreateButton("TitleButton", mainPanel.transform, "タイトルに戻る", new Vector2(420f, 64f), new Color(0.22f, 0.18f, 0.14f, 1f));
+        Button quitButton = CreateButton("QuitButton", mainPanel.transform, "ゲーム終了", new Vector2(420f, 64f), new Color(0.35f, 0.13f, 0.15f, 1f));
+
+        CreateText("OptionTitle", optionPanel.transform, "オプション", 48f, FontStyles.Bold, Color.white, new Vector2(720f, 70f));
+        Slider masterSlider = CreateSliderRow(optionPanel.transform, "MasterVolume", "マスター", out TMP_Text masterValue);
+        Slider bgmSlider = CreateSliderRow(optionPanel.transform, "BGM", "BGM", out TMP_Text bgmValue);
+        Slider seSlider = CreateSliderRow(optionPanel.transform, "SE", "SE", out TMP_Text seValue);
+        Slider sensitivitySlider = CreateSliderRow(optionPanel.transform, "Sensitivity", "感度", out TMP_Text sensitivityValue);
+        Slider stickSensitivitySlider = CreateSliderRow(optionPanel.transform, "StickSensitivity", "スティック感度", out TMP_Text stickSensitivityValue);
+        Slider fovSlider = CreateSliderRow(optionPanel.transform, "FOV", "視野角", out TMP_Text fovValue);
+        Toggle invertYToggle = CreateToggleRow(optionPanel.transform, "InvertY", "上下視点反転");
+        Toggle cameraShakeToggle = CreateToggleRow(optionPanel.transform, "CameraShake", "画面揺れ");
+        Slider qualitySlider = CreateSliderRow(optionPanel.transform, "Quality", "画質", out TMP_Text qualityValue);
+        Slider fpsSlider = CreateSliderRow(optionPanel.transform, "Fps", "FPS上限", out TMP_Text fpsValue);
+        Toggle vSyncToggle = CreateToggleRow(optionPanel.transform, "VSync", "VSync：OFF", out TMP_Text vSyncLabel);
+        Toggle fullscreenToggle = CreateToggleRow(optionPanel.transform, "Fullscreen", "表示モード：フルスクリーン", out TMP_Text fullscreenLabel);
+        Slider resolutionSlider = CreateSliderRow(optionPanel.transform, "WindowResolution", "ウィンドウサイズ", out TMP_Text resolutionValue);
+        Button closeOptionButton = CreateButton("CloseOptionButton", optionPanel.transform, "戻る", new Vector2(360f, 58f), new Color(0.16f, 0.22f, 0.32f, 1f));
+
+        mainPanel.SetActive(!optionSceneMode);
+        optionPanel.SetActive(optionSceneMode);
+        pauseRoot.SetActive(optionSceneMode);
+
+        SerializedObject serializedController = new SerializedObject(controller);
+        SetObject(serializedController, "pauseRoot", pauseRoot);
+        SetObject(serializedController, "mainPanel", mainPanel);
+        SetObject(serializedController, "optionPanel", optionPanel);
+        SetObject(serializedController, "resumeButton", resumeButton);
+        SetObject(serializedController, "optionButton", optionButton);
+        SetObject(serializedController, "closeOptionButton", closeOptionButton);
+        SetObject(serializedController, "titleButton", titleButton);
+        SetObject(serializedController, "quitButton", quitButton);
+        SetObject(serializedController, "masterVolumeSlider", masterSlider);
+        SetObject(serializedController, "bgmSlider", bgmSlider);
+        SetObject(serializedController, "seSlider", seSlider);
+        SetObject(serializedController, "masterVolumeValueText", masterValue);
+        SetObject(serializedController, "bgmValueText", bgmValue);
+        SetObject(serializedController, "seValueText", seValue);
+        SetObject(serializedController, "sensitivitySlider", sensitivitySlider);
+        SetObject(serializedController, "stickSensitivitySlider", stickSensitivitySlider);
+        SetObject(serializedController, "fovSlider", fovSlider);
+        SetObject(serializedController, "sensitivityValueText", sensitivityValue);
+        SetObject(serializedController, "stickSensitivityValueText", stickSensitivityValue);
+        SetObject(serializedController, "fovValueText", fovValue);
+        SetObject(serializedController, "invertYToggle", invertYToggle);
+        SetObject(serializedController, "cameraShakeToggle", cameraShakeToggle);
+        SetObject(serializedController, "qualitySlider", qualitySlider);
+        SetObject(serializedController, "qualityValueText", qualityValue);
+        SetObject(serializedController, "fpsSlider", fpsSlider);
+        SetObject(serializedController, "fpsValueText", fpsValue);
+        SetObject(serializedController, "vSyncToggle", vSyncToggle);
+        SetObject(serializedController, "vSyncLabel", vSyncLabel);
+        SetObject(serializedController, "fullscreenToggle", fullscreenToggle);
+        SetObject(serializedController, "fullscreenLabel", fullscreenLabel);
+        SetObject(serializedController, "windowResolutionSlider", resolutionSlider);
+        SetObject(serializedController, "windowResolutionValueText", resolutionValue);
+        SetString(serializedController, "titleSceneName", "TitleScene");
+        SetString(serializedController, "fallbackReturnSceneName", "TitleScene");
+        SetBool(serializedController, "freezeSoloGame", !optionSceneMode);
+        SetBool(serializedController, "optionSceneMode", optionSceneMode);
+        serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+        EditorUtility.SetDirty(controller);
+        EditorSceneManager.SaveScene(scene, scenePath);
+        EnsureSceneInBuildSettings(scenePath);
+
+        if (previousScene.IsValid() && previousScene.isLoaded && previousScene != scene)
+            SceneManager.SetActiveScene(previousScene);
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
+
+    private static RectPreset StretchFull => new RectPreset(Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+    private static RectPreset CenterPanel(float width, float height)
+    {
+        return new RectPreset(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(width, height));
+    }
+
+    private static GameObject CreatePanel(string name, Transform parent, RectPreset preset, Color color)
+    {
+        GameObject obj = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        obj.transform.SetParent(parent, false);
+        ApplyRect(obj.GetComponent<RectTransform>(), preset);
+        Image image = obj.GetComponent<Image>();
+        image.color = color;
+        image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd");
+        image.type = Image.Type.Sliced;
+        return obj;
+    }
+
+    private static TMP_Text CreateText(string name, Transform parent, string text, float fontSize, FontStyles style, Color color, Vector2 size)
+    {
+        GameObject obj = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        obj.transform.SetParent(parent, false);
+        RectTransform rect = obj.GetComponent<RectTransform>();
+        rect.sizeDelta = size;
+        TMP_Text label = obj.GetComponent<TMP_Text>();
+        label.text = text;
+        label.fontSize = fontSize;
+        label.fontStyle = style;
+        label.color = color;
+        label.alignment = TextAlignmentOptions.Center;
+        label.enableAutoSizing = false;
+        return label;
+    }
+
+    private static Button CreateButton(string name, Transform parent, string text, Vector2 size, Color color)
+    {
+        GameObject obj = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        obj.transform.SetParent(parent, false);
+        RectTransform rect = obj.GetComponent<RectTransform>();
+        rect.sizeDelta = size;
+
+        Image image = obj.GetComponent<Image>();
+        image.color = color;
+        image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        image.type = Image.Type.Sliced;
+
+        Button button = obj.GetComponent<Button>();
+        button.targetGraphic = image;
+
+        TMP_Text label = CreateText("Label", obj.transform, text, 30f, FontStyles.Bold, Color.white, size);
+        RectTransform labelRect = label.GetComponent<RectTransform>();
+        ApplyRect(labelRect, StretchFull);
+        return button;
+    }
+
+    private static Slider CreateSliderRow(Transform parent, string key, string labelText, out TMP_Text valueText)
+    {
+        GameObject row = new GameObject($"{key}Row", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        row.transform.SetParent(parent, false);
+        RectTransform rowRect = row.GetComponent<RectTransform>();
+        rowRect.sizeDelta = new Vector2(720f, 54f);
+        HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.spacing = 18f;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        CreateText($"{key}Label", row.transform, labelText, 26f, FontStyles.Bold, Color.white, new Vector2(160f, 48f));
+        Slider slider = CreateSlider($"{key}Slider", row.transform, new Vector2(420f, 34f));
+        valueText = CreateText($"{key}ValueText", row.transform, "100", 24f, FontStyles.Normal, new Color(0.75f, 0.92f, 1f, 1f), new Vector2(90f, 48f));
+        return slider;
+    }
+
+    private static Slider CreateSlider(string name, Transform parent, Vector2 size)
+    {
+        GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Slider));
+        obj.transform.SetParent(parent, false);
+        obj.GetComponent<RectTransform>().sizeDelta = size;
+
+        GameObject background = CreateImage("Background", obj.transform, StretchFull, new Color(0.18f, 0.2f, 0.24f, 1f));
+        RectTransform backgroundRect = background.GetComponent<RectTransform>();
+        backgroundRect.anchorMin = new Vector2(0f, 0.35f);
+        backgroundRect.anchorMax = new Vector2(1f, 0.65f);
+
+        GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
+        fillArea.transform.SetParent(obj.transform, false);
+        ApplyRect(fillArea.GetComponent<RectTransform>(), new RectPreset(Vector2.zero, Vector2.one, new Vector2(6f, 0f), new Vector2(-6f, 0f)));
+
+        GameObject fill = CreateImage("Fill", fillArea.transform, StretchFull, new Color(0.25f, 0.85f, 0.58f, 1f));
+        RectTransform fillRect = fill.GetComponent<RectTransform>();
+        fillRect.anchorMin = new Vector2(0f, 0.35f);
+        fillRect.anchorMax = new Vector2(1f, 0.65f);
+
+        GameObject handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
+        handleArea.transform.SetParent(obj.transform, false);
+        ApplyRect(handleArea.GetComponent<RectTransform>(), new RectPreset(Vector2.zero, Vector2.one, new Vector2(10f, 0f), new Vector2(-10f, 0f)));
+
+        GameObject handle = CreateImage("Handle", handleArea.transform, new RectPreset(new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(26f, 26f)), Color.white);
+
+        Slider slider = obj.GetComponent<Slider>();
+        slider.targetGraphic = handle.GetComponent<Image>();
+        slider.fillRect = fillRect;
+        slider.handleRect = handle.GetComponent<RectTransform>();
+        slider.minValue = 0f;
+        slider.maxValue = 1f;
+        slider.value = 1f;
+        return slider;
+    }
+
+    private static Toggle CreateToggleRow(Transform parent, string key, string labelText)
+    {
+        return CreateToggleRow(parent, key, labelText, out _);
+    }
+
+    private static Toggle CreateToggleRow(
+        Transform parent,
+        string key,
+        string labelText,
+        out TMP_Text label)
+    {
+        GameObject row = new GameObject($"{key}Row", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        row.transform.SetParent(parent, false);
+        row.GetComponent<RectTransform>().sizeDelta = new Vector2(720f, 54f);
+        HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.spacing = 18f;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        label = CreateText($"{key}Label", row.transform, labelText, 26f, FontStyles.Bold, Color.white, new Vector2(500f, 48f));
+
+        GameObject obj = new GameObject($"{key}Toggle", typeof(RectTransform), typeof(Toggle));
+        obj.transform.SetParent(row.transform, false);
+        obj.GetComponent<RectTransform>().sizeDelta = new Vector2(70f, 42f);
+
+        GameObject background = CreateImage("Background", obj.transform, StretchFull, new Color(0.18f, 0.2f, 0.24f, 1f));
+        GameObject checkmark = CreateImage("Checkmark", background.transform, new RectPreset(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(44f, 24f)), new Color(0.25f, 0.85f, 0.58f, 1f));
+
+        Toggle toggle = obj.GetComponent<Toggle>();
+        toggle.targetGraphic = background.GetComponent<Image>();
+        toggle.graphic = checkmark.GetComponent<Image>();
+        toggle.isOn = true;
+        return toggle;
+    }
+
+    private static GameObject CreateImage(string name, Transform parent, RectPreset preset, Color color)
+    {
+        GameObject obj = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        obj.transform.SetParent(parent, false);
+        ApplyRect(obj.GetComponent<RectTransform>(), preset);
+        Image image = obj.GetComponent<Image>();
+        image.color = color;
+        image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        image.type = Image.Type.Sliced;
+        return obj;
+    }
+
+    private static void AddVerticalLayout(GameObject obj, int left, int right, int top, int bottom, float spacing, TextAnchor alignment)
+    {
+        VerticalLayoutGroup layout = obj.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(left, right, top, bottom);
+        layout.spacing = spacing;
+        layout.childAlignment = alignment;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+    }
+
+    private static void ApplyRect(RectTransform rect, RectPreset preset)
+    {
+        rect.anchorMin = preset.AnchorMin;
+        rect.anchorMax = preset.AnchorMax;
+        rect.anchoredPosition = preset.AnchoredPosition;
+        rect.sizeDelta = preset.SizeDelta;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+    }
+
+    private static void SetObject(SerializedObject serializedObject, string propertyName, Object value)
+    {
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+            property.objectReferenceValue = value;
+    }
+
+    private static void SetString(SerializedObject serializedObject, string propertyName, string value)
+    {
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+            property.stringValue = value;
+    }
+
+    private static void SetBool(SerializedObject serializedObject, string propertyName, bool value)
+    {
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+            property.boolValue = value;
+    }
+
+    private static void EnsureSceneInBuildSettings(string scenePath)
+    {
+        EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
+
+        for (int i = 0; i < scenes.Length; i++)
+        {
+            if (scenes[i].path == scenePath)
+            {
+                scenes[i].enabled = true;
+                EditorBuildSettings.scenes = scenes;
+                return;
+            }
+        }
+
+        EditorBuildSettingsScene[] updated = new EditorBuildSettingsScene[scenes.Length + 1];
+        for (int i = 0; i < scenes.Length; i++)
+            updated[i] = scenes[i];
+
+        updated[updated.Length - 1] = new EditorBuildSettingsScene(scenePath, true);
+        EditorBuildSettings.scenes = updated;
+    }
+
+    private readonly struct RectPreset
+    {
+        public RectPreset(Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPosition, Vector2 sizeDelta)
+        {
+            AnchorMin = anchorMin;
+            AnchorMax = anchorMax;
+            AnchoredPosition = anchoredPosition;
+            SizeDelta = sizeDelta;
+        }
+
+        public Vector2 AnchorMin { get; }
+        public Vector2 AnchorMax { get; }
+        public Vector2 AnchoredPosition { get; }
+        public Vector2 SizeDelta { get; }
+    }
+}

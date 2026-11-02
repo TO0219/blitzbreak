@@ -1,0 +1,102 @@
+using MyGame;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public static class BattleHudSceneSetup
+{
+    private const string BattleUiScenePath = "Assets/Scenes/BattleUIScene.unity";
+    private static readonly string[] LegacyBattleUiObjectNames =
+    {
+        "PlayerHealthUI",
+        "AirGaugeUI",
+        "AirTimeUI",
+        "PlayerHealthRoot",
+        "PlayerHealthBG",
+        "PlayerHealthFill",
+        "AirGaugeRoot",
+        "AirGaugeBG",
+        "AirGaugeFill1",
+        "AirGaugeFill2",
+        "AirGaugeFill3",
+        "AirTimeRoot",
+        "AirTimeBG",
+        "AirTimeFill"
+    };
+
+    [MenuItem("Tools/Battle UI/Setup Battle HUD")]
+    public static void SetupBattleHud()
+    {
+        Scene scene = EditorSceneManager.OpenScene(BattleUiScenePath, OpenSceneMode.Single);
+
+        for (int i = 0; i < LegacyBattleUiObjectNames.Length; i++)
+            DeleteObject(LegacyBattleUiObjectNames[i]);
+
+        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
+        if (canvas == null)
+        {
+            Debug.LogError("Battle HUD setup failed: Canvas not found.");
+            return;
+        }
+
+        GameObject hudObject = GameObject.Find("BattleStatusHUD");
+        if (hudObject == null)
+        {
+            hudObject = new GameObject("BattleStatusHUD", typeof(RectTransform), typeof(BattleHudUIEntity));
+        }
+
+        BattleHudUIEntity hud = hudObject.GetComponent<BattleHudUIEntity>();
+        if (hud == null)
+            hud = hudObject.AddComponent<BattleHudUIEntity>();
+
+        hud.BuildDefaultLayout(canvas.transform);
+
+        BattleUIBinderEntity binder = Object.FindAnyObjectByType<BattleUIBinderEntity>();
+        if (binder != null)
+        {
+            SerializedObject serializedBinder = new SerializedObject(binder);
+            SetObjectReference(serializedBinder, "playerHealthUI", null);
+            SetObjectReference(serializedBinder, "airGaugeUI", null);
+            SetObjectReference(serializedBinder, "airTimeUI", null);
+            SetObjectReference(serializedBinder, "scoreUI", null);
+            SetObjectReference(serializedBinder, "timerUI", null);
+            SetObjectReference(serializedBinder, "battleHudUI", hud);
+            SetBool(serializedBinder, "useUnifiedBattleHud", true);
+            SetBool(serializedBinder, "hideLegacyBattleWidgets", true);
+            serializedBinder.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(binder);
+        }
+
+        EditorUtility.SetDirty(hud);
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+    }
+
+    public static void Run()
+    {
+        SetupBattleHud();
+    }
+
+    private static void DeleteObject(string objectName)
+    {
+        GameObject target = GameObject.Find(objectName);
+        if (target != null)
+            Object.DestroyImmediate(target);
+    }
+
+    private static void SetObjectReference(SerializedObject serializedObject, string propertyName, Object value)
+    {
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+            property.objectReferenceValue = value;
+    }
+
+    private static void SetBool(SerializedObject serializedObject, string propertyName, bool value)
+    {
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null)
+            property.boolValue = value;
+    }
+}

@@ -1,0 +1,450 @@
+using System;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.Animations;
+using UnityEngine;
+
+namespace MyGame.EditorTools
+{
+    public sealed class GatlingAnimationSetup : AssetPostprocessor
+    {
+        private const string GatlingModelPath = "Assets/Model/MachineGunMotionBase.fbx";
+        private const string GatlingControllerPath = "Assets/Animations/GatlingTurretLoop.controller";
+        private const string GatlingPrefabPath = "Assets/Prefabs/Turret/GatlingTurretModel.prefab";
+        private const string PlayerPrefabPath = "Assets/Prefabs/Player.prefab";
+        private const string GatlingStartStateName = "Gatling_Start";
+        private const string GatlingLoopStateName = "Gatling_Loop";
+        private const string GatlingEndStateName = "Gatling_End";
+        private const string GatlingStartClipName = "SpinUp";
+        private const string GatlingLoopClipName = "FireLoop";
+        private const string GatlingEndClipName = "SpinDown";
+        private const string GatlingAnimationRootName = "MachineGunMotionBase";
+        private const float GatlingStartAnimationSpeed = 2.5f;
+
+        private static bool s_isConfiguring;
+
+        [InitializeOnLoadMethod]
+        private static void ConfigureOnLoad()
+        {
+            EditorApplication.delayCall += ConfigureGatlingAnimation;
+        }
+
+        private void OnPostprocessModel(GameObject gameObject)
+        {
+            if (assetPath == GatlingModelPath)
+                EditorApplication.delayCall += ConfigureGatlingAnimation;
+        }
+
+        [MenuItem("Tools/MyGame/Setup Gatling Animation")]
+        public static void ConfigureGatlingAnimation()
+        {
+            if (s_isConfiguring)
+                return;
+
+            s_isConfiguring = true;
+
+            try
+            {
+                ConfigureImporter();
+                ConfigureController();
+                ConfigurePrefab();
+                ConfigurePlayerPrefab();
+            }
+            finally
+            {
+                s_isConfiguring = false;
+            }
+        }
+
+        private static void ConfigureImporter()
+        {
+            var importer = AssetImporter.GetAtPath(GatlingModelPath) as ModelImporter;
+            if (importer == null)
+                return;
+
+            bool changed = false;
+
+            if (!importer.importAnimation)
+            {
+                importer.importAnimation = true;
+                changed = true;
+            }
+
+            if (!importer.resampleCurves)
+            {
+                importer.resampleCurves = true;
+                changed = true;
+            }
+
+            if (importer.animationWrapMode != WrapMode.Once)
+            {
+                importer.animationWrapMode = WrapMode.Once;
+                changed = true;
+            }
+
+            if (importer.animationType != ModelImporterAnimationType.Generic)
+            {
+                importer.animationType = ModelImporterAnimationType.Generic;
+                changed = true;
+            }
+
+            if (importer.animationCompression != ModelImporterAnimationCompression.Off)
+            {
+                importer.animationCompression = ModelImporterAnimationCompression.Off;
+                changed = true;
+            }
+
+            ModelImporterClipAnimation[] clips = importer.clipAnimations;
+            if (clips == null || clips.Length == 0)
+                clips = importer.defaultClipAnimations;
+
+            if (clips != null && clips.Length > 0)
+            {
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    ModelImporterClipAnimation clip = clips[i];
+                    bool clipChanged = false;
+
+                    if (clip.loopTime)
+                    {
+                        clip.loopTime = false;
+                        clipChanged = true;
+                    }
+
+                    if (clip.loopPose)
+                    {
+                        clip.loopPose = false;
+                        clipChanged = true;
+                    }
+
+                    if (clip.wrapMode != WrapMode.Once)
+                    {
+                        clip.wrapMode = WrapMode.Once;
+                        clipChanged = true;
+                    }
+
+                    if (clipChanged)
+                    {
+                        clips[i] = clip;
+                        changed = true;
+                    }
+                }
+
+                importer.clipAnimations = clips;
+            }
+
+            if (changed)
+                importer.SaveAndReimport();
+        }
+
+        private static void ConfigureController()
+        {
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(GatlingControllerPath);
+            if (controller == null)
+                return;
+
+            bool changed = false;
+            changed |= SetStateClip(controller, GatlingStartStateName, GatlingStartClipName);
+            changed |= SetStateClip(controller, GatlingLoopStateName, GatlingLoopClipName);
+            changed |= SetStateClip(controller, GatlingEndStateName, GatlingEndClipName);
+
+            if (changed)
+            {
+                EditorUtility.SetDirty(controller);
+                AssetDatabase.SaveAssets();
+            }
+        }
+
+        private static void ConfigurePrefab()
+        {
+            var controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(GatlingControllerPath);
+            var modelPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(GatlingModelPath);
+            if (controller == null || modelPrefab == null)
+                return;
+
+            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(GatlingPrefabPath);
+            if (prefabRoot == null)
+                return;
+
+            bool changed = false;
+
+            try
+            {
+                Transform barrel = FindDescendant(prefabRoot.transform, "Barrel");
+                if (barrel == null)
+                    return;
+
+                Vector3 leftMuzzlePosition = new Vector3(-0.07f, 0f, 0.35f);
+                Vector3 rightMuzzlePosition = new Vector3(0.07f, 0f, 0.35f);
+                Quaternion leftMuzzleRotation = Quaternion.identity;
+                Quaternion rightMuzzleRotation = Quaternion.identity;
+                CaptureMuzzlePose(barrel, "Muzzle_L", ref leftMuzzlePosition, ref leftMuzzleRotation);
+                CaptureMuzzlePose(barrel, "Muzzle_R", ref rightMuzzlePosition, ref rightMuzzleRotation);
+
+                Transform animationRoot = FindDescendant(barrel, GatlingAnimationRootName);
+                GameObject modelInstance = animationRoot != null ? animationRoot.gameObject : null;
+                if (modelInstance == null)
+                {
+                    modelInstance = PrefabUtility.InstantiatePrefab(modelPrefab, barrel) as GameObject;
+                    if (modelInstance == null)
+                        modelInstance = UnityEngine.Object.Instantiate(modelPrefab, barrel);
+
+                    modelInstance.name = GatlingAnimationRootName;
+                    changed = true;
+                }
+
+                if (modelInstance.transform.parent != barrel)
+                {
+                    modelInstance.transform.SetParent(barrel, false);
+                    changed = true;
+                }
+
+                if (modelInstance.transform.localPosition != Vector3.zero)
+                {
+                    modelInstance.transform.localPosition = Vector3.zero;
+                    changed = true;
+                }
+
+                if (modelInstance.transform.localRotation != Quaternion.identity)
+                {
+                    modelInstance.transform.localRotation = Quaternion.identity;
+                    changed = true;
+                }
+
+                if (modelInstance.transform.localScale != Vector3.one)
+                {
+                    modelInstance.transform.localScale = Vector3.one;
+                    changed = true;
+                }
+
+                animationRoot = modelInstance.transform;
+                Animator animator = animationRoot.GetComponent<Animator>();
+                if (animator == null)
+                {
+                    animator = animationRoot.gameObject.AddComponent<Animator>();
+                    changed = true;
+                }
+
+                if (animator.runtimeAnimatorController != controller)
+                {
+                    animator.runtimeAnimatorController = controller;
+                    changed = true;
+                }
+
+                if (animator.applyRootMotion)
+                {
+                    animator.applyRootMotion = false;
+                    changed = true;
+                }
+
+                if (animator.cullingMode != AnimatorCullingMode.AlwaysAnimate)
+                {
+                    animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                    changed = true;
+                }
+
+                changed |= CreateOrUpdateMuzzle(animationRoot, barrel, "Muzzle_L", leftMuzzlePosition, leftMuzzleRotation);
+                changed |= CreateOrUpdateMuzzle(animationRoot, barrel, "Muzzle_R", rightMuzzlePosition, rightMuzzleRotation);
+
+                if (changed)
+                    PrefabUtility.SaveAsPrefabAsset(prefabRoot, GatlingPrefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(prefabRoot);
+            }
+        }
+
+        private static void ConfigurePlayerPrefab()
+        {
+            var controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(GatlingControllerPath);
+            if (controller == null)
+                return;
+
+            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(PlayerPrefabPath);
+            if (prefabRoot == null)
+                return;
+
+            bool changed = false;
+
+            try
+            {
+                var turretManager = prefabRoot.GetComponent<TurretManagerEntity>();
+                if (turretManager == null)
+                    return;
+
+                var serializedObject = new SerializedObject(turretManager);
+                SerializedProperty controllerProperty =
+                    serializedObject.FindProperty("gatlingAnimationController");
+                SerializedProperty rootNameProperty =
+                    serializedObject.FindProperty("gatlingAnimationRootName");
+                SerializedProperty startSpeedProperty =
+                    serializedObject.FindProperty("gatlingStartAnimationSpeed");
+
+                if (controllerProperty != null &&
+                    controllerProperty.objectReferenceValue != controller)
+                {
+                    controllerProperty.objectReferenceValue = controller;
+                    changed = true;
+                }
+
+                if (rootNameProperty != null &&
+                    rootNameProperty.stringValue != GatlingAnimationRootName)
+                {
+                    rootNameProperty.stringValue = GatlingAnimationRootName;
+                    changed = true;
+                }
+
+                if (startSpeedProperty != null &&
+                    !Mathf.Approximately(startSpeedProperty.floatValue, GatlingStartAnimationSpeed))
+                {
+                    startSpeedProperty.floatValue = GatlingStartAnimationSpeed;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    serializedObject.ApplyModifiedPropertiesWithoutUndo();
+                    PrefabUtility.SaveAsPrefabAsset(prefabRoot, PlayerPrefabPath);
+                }
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(prefabRoot);
+            }
+        }
+
+        private static bool SetStateClip(
+            AnimatorController controller,
+            string stateName,
+            string clipName)
+        {
+            AnimationClip clip = FindGatlingClip(clipName);
+            if (clip == null)
+                return false;
+
+            AnimatorState state = FindOrCreateState(controller, stateName);
+            if (state == null)
+                return false;
+
+            bool changed = false;
+
+            if (state.motion != clip)
+            {
+                state.motion = clip;
+                changed = true;
+            }
+
+            if (!Mathf.Approximately(state.speed, 1f))
+            {
+                state.speed = 1f;
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        private static AnimationClip FindGatlingClip(string clipName)
+        {
+            return AssetDatabase.LoadAllAssetsAtPath(GatlingModelPath)
+                .OfType<AnimationClip>()
+                .FirstOrDefault(clip =>
+                    clip != null &&
+                    clip.name == clipName &&
+                    !clip.name.StartsWith("__preview__", StringComparison.Ordinal));
+        }
+
+        private static AnimatorState FindOrCreateState(AnimatorController controller, string stateName)
+        {
+            for (int layerIndex = 0; layerIndex < controller.layers.Length; layerIndex++)
+            {
+                AnimatorStateMachine stateMachine = controller.layers[layerIndex].stateMachine;
+                ChildAnimatorState[] states = stateMachine.states;
+                for (int stateIndex = 0; stateIndex < states.Length; stateIndex++)
+                {
+                    AnimatorState state = states[stateIndex].state;
+                    if (state != null && state.name == stateName)
+                        return state;
+                }
+
+                if (layerIndex == 0)
+                    return stateMachine.AddState(stateName);
+            }
+
+            return null;
+        }
+
+        private static Transform FindDescendant(Transform root, string targetName)
+        {
+            if (root == null)
+                return null;
+
+            if (root.name == targetName)
+                return root;
+
+            foreach (Transform child in root)
+            {
+                Transform result = FindDescendant(child, targetName);
+                if (result != null)
+                    return result;
+            }
+
+            return null;
+        }
+
+        private static void CaptureMuzzlePose(
+            Transform barrel,
+            string muzzleName,
+            ref Vector3 localPosition,
+            ref Quaternion localRotation)
+        {
+            Transform muzzle = FindDescendant(barrel, muzzleName);
+            if (muzzle == null)
+                return;
+
+            localPosition = barrel.InverseTransformPoint(muzzle.position);
+            localRotation = Quaternion.Inverse(barrel.rotation) * muzzle.rotation;
+        }
+
+        private static bool CreateOrUpdateMuzzle(
+            Transform modelRoot,
+            Transform barrel,
+            string muzzleName,
+            Vector3 barrelLocalPosition,
+            Quaternion barrelLocalRotation)
+        {
+            bool changed = false;
+            Transform muzzle = FindDescendant(modelRoot, muzzleName);
+            if (muzzle == null)
+            {
+                muzzle = new GameObject(muzzleName).transform;
+                muzzle.SetParent(modelRoot, false);
+                changed = true;
+            }
+
+            Vector3 targetPosition = barrel.TransformPoint(barrelLocalPosition);
+            Quaternion targetRotation = barrel.rotation * barrelLocalRotation;
+            Vector3 targetScale = Vector3.one * 0.1f;
+
+            if (muzzle.position != targetPosition)
+            {
+                muzzle.position = targetPosition;
+                changed = true;
+            }
+
+            if (muzzle.rotation != targetRotation)
+            {
+                muzzle.rotation = targetRotation;
+                changed = true;
+            }
+
+            if (muzzle.localScale != targetScale)
+            {
+                muzzle.localScale = targetScale;
+                changed = true;
+            }
+
+            return changed;
+        }
+    }
+}

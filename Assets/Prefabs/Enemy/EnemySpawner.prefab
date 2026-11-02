@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &9151252840158916435
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 370395031770884033}
+  - component: {fileID: 2847749267910512907}
+  m_Layer: 0
+  m_Name: EnemySpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &370395031770884033
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9151252840158916435}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -9.8073, y: 0, z: -5.2349}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2847749267910512907
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9151252840158916435}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f75982a047fe2e4a995b2d6499efe65, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MyGame.EnemySpawnerEntity
+  enemyPrefab: {fileID: 7051054747131983212, guid: 5cd7c3a1183d13c4baca449d4b1acbfc, type: 3}
+  initialSpawnCount: 3
+  spawnInterval: 5
+  maxSpawnCount: 10
+  spawnRadius: 50
+  groundEnemySpawnWeight: 0.7
+  airEnemySpawnWeight: 0.3
+  infightEnemySpawnWeight: 0.2
+  shooterEnemySpawnWeight: 0.8
+  groundInfightEnemiesSpawn: 0
+  groundShooterEnemiesSpawn: 1
+  airInfightEnemiesSpawn: 1
+  airShooterEnemiesSpawn: 1
+  useEvenSpawnDistribution: 1
+  spawnPositionJitter: 0.2
+  spawnHeight: 3
+  spawnPositionAttempts: 24
+  spawnClearanceRadius: 0.65
+  spawnClearanceHeight: 2
+  spawnObstacleLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  spawnGroundLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  spawnGroundRayDistance: 30
+  spawnAreaGizmoColor: {r: 0.2, g: 0.75, b: 1, a: 0.25}
+  spawnAreaWireGizmoColor: {r: 0.2, g: 0.75, b: 1, a: 1}

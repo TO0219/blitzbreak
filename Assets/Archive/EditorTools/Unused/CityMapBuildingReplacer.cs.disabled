@@ -1,0 +1,224 @@
+using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public static class CityMapBuildingReplacer
+{
+    private const string ModelFolder = "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models";
+
+    private static readonly string[] ScenePaths =
+    {
+        "Assets/Scenes/BattleScene.unity",
+        "Assets/Scenes/BattleSceneOyama.unity"
+    };
+
+    private static readonly string[] BuildingNamePrefixes =
+    {
+        "office_building_",
+        "factory_building_",
+        "factory_chimney",
+        "mid_house_",
+        "small_house_",
+        "basement_"
+    };
+
+    [MenuItem("Tools/Cluster Destruction/Replace Battle City Buildings")]
+    public static void ReplaceBattleCityBuildingsFromMenu()
+    {
+        ReplaceBattleCityBuildings();
+    }
+
+    public static void ReplaceBattleCityBuildingsFromCommandLine()
+    {
+        ReplaceBattleCityBuildings();
+    }
+
+    public static void ReplaceBattleCityBuildings()
+    {
+        Dictionary<string, GameObject> modelPrefabs = LoadBuildingPrefabs();
+        int totalReplaced = 0;
+
+        for (int i = 0; i < ScenePaths.Length; i++)
+        {
+            string scenePath = ScenePaths[i];
+            if (!File.Exists(scenePath))
+                continue;
+
+            Scene scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            GameObject cityMap = GameObject.Find("CityMap");
+            if (cityMap == null)
+            {
+                Debug.LogWarning($"CityMap not found in {scenePath}");
+                continue;
+            }
+
+            int replaced = ReplaceCityMapChildren(cityMap.transform, modelPrefabs);
+            totalReplaced += replaced;
+
+            if (replaced > 0)
+            {
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
+            }
+
+            Debug.Log($"CityMap building replace: {scenePath}, replaced={replaced}");
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log($"CityMap building replace complete. totalReplaced={totalReplaced}");
+    }
+
+    private static int ReplaceCityMapChildren(
+        Transform cityMap,
+        Dictionary<string, GameObject> modelPrefabs)
+    {
+        List<Transform> targets = new List<Transform>();
+        for (int i = 0; i < cityMap.childCount; i++)
+        {
+            Transform child = cityMap.GetChild(i);
+            string modelName = ToModelName(child.name);
+            if (!IsBuildingName(modelName))
+                continue;
+
+            if (!modelPrefabs.ContainsKey(modelName))
+            {
+                Debug.LogWarning($"CityMap building source model not found: {modelName}");
+                continue;
+            }
+
+            targets.Add(child);
+        }
+
+        int replaced = 0;
+        for (int i = 0; i < targets.Count; i++)
+        {
+            Transform oldTransform = targets[i];
+            if (oldTransform == null)
+                continue;
+
+            string originalName = oldTransform.name;
+            string modelName = ToModelName(originalName);
+            if (!modelPrefabs.TryGetValue(modelName, out GameObject prefab) || prefab == null)
+                continue;
+
+            Transform parent = oldTransform.parent;
+            int siblingIndex = oldTransform.GetSiblingIndex();
+            Vector3 localPosition = oldTransform.localPosition;
+            Quaternion localRotation = oldTransform.localRotation;
+            Vector3 localScale = oldTransform.localScale;
+            int layer = oldTransform.gameObject.layer;
+            string tag = oldTransform.gameObject.tag;
+            bool activeSelf = oldTransform.gameObject.activeSelf;
+            StaticEditorFlags staticFlags = GameObjectUtility.GetStaticEditorFlags(oldTransform.gameObject);
+
+            GameObject replacement = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            if (replacement == null)
+                continue;
+
+            replacement.name = originalName;
+            replacement.transform.SetParent(parent, false);
+            replacement.transform.SetSiblingIndex(siblingIndex);
+            replacement.transform.localPosition = localPosition;
+            replacement.transform.localRotation = localRotation;
+            replacement.transform.localScale = localScale;
+            replacement.layer = layer;
+            replacement.tag = tag;
+            replacement.SetActive(activeSelf);
+            GameObjectUtility.SetStaticEditorFlags(replacement, staticFlags);
+            CopyStaticFlagsToChildren(replacement.transform, staticFlags);
+
+            Object.DestroyImmediate(oldTransform.gameObject);
+            replaced++;
+        }
+
+        return replaced;
+    }
+
+    private static Dictionary<string, GameObject> LoadBuildingPrefabs()
+    {
+        Dictionary<string, GameObject> prefabs = new Dictionary<string, GameObject>();
+        string[] guids = AssetDatabase.FindAssets("t:Model", new[] { ModelFolder });
+
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            string modelName = Path.GetFileNameWithoutExtension(path);
+            if (!IsBuildingName(modelName))
+                continue;
+
+            EnsureModelReadable(path);
+
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab != null)
+            {
+                prefabs[modelName] = prefab;
+            }
+        }
+
+        return prefabs;
+    }
+
+    private static void EnsureModelReadable(string path)
+    {
+        ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
+        if (importer == null)
+            return;
+
+        if (!importer.isReadable)
+        {
+            importer.isReadable = true;
+            importer.SaveAndReimport();
+        }
+    }
+
+    private static bool IsBuildingName(string objectName)
+    {
+        if (string.IsNullOrWhiteSpace(objectName))
+            return false;
+
+        for (int i = 0; i < BuildingNamePrefixes.Length; i++)
+        {
+            if (objectName.StartsWith(BuildingNamePrefixes[i], System.StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string ToModelName(string objectName)
+    {
+        if (string.IsNullOrWhiteSpace(objectName))
+            return string.Empty;
+
+        int suffixIndex = objectName.IndexOf(" (", System.StringComparison.Ordinal);
+        if (suffixIndex >= 0)
+        {
+            objectName = objectName.Substring(0, suffixIndex);
+        }
+
+        if (objectName.StartsWith("Intact_", System.StringComparison.Ordinal))
+        {
+            objectName = objectName.Substring("Intact_".Length);
+        }
+
+        if (objectName.StartsWith("DestructibleBuilding_", System.StringComparison.Ordinal))
+        {
+            objectName = objectName.Substring("DestructibleBuilding_".Length);
+        }
+
+        return objectName;
+    }
+
+    private static void CopyStaticFlagsToChildren(Transform root, StaticEditorFlags staticFlags)
+    {
+        Transform[] children = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < children.Length; i++)
+        {
+            GameObjectUtility.SetStaticEditorFlags(children[i].gameObject, staticFlags);
+        }
+    }
+}

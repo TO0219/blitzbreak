@@ -1,0 +1,95 @@
+using System.IO;
+using MyGame;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.SceneManagement;
+
+public static class ResultSceneCreator
+{
+    private const string ScenePath = "Assets/Scenes/Result/ResultScene.unity";
+    private const string AutoCreateSessionKey = "ResultSceneCreator.AutoCreateAttempted.v1";
+
+    [MenuItem("Tools/Result/Create Result Scene")]
+    public static void CreateSceneFromMenu()
+    {
+        CreateScene();
+    }
+
+    [InitializeOnLoadMethod]
+    private static void AutoCreateSceneOnce()
+    {
+        if (File.Exists(ScenePath)) return;
+        if (SessionState.GetBool(AutoCreateSessionKey, false)) return;
+
+        SessionState.SetBool(AutoCreateSessionKey, true);
+        EditorApplication.delayCall += () =>
+        {
+            if (!File.Exists(ScenePath))
+            {
+                CreateScene();
+            }
+        };
+    }
+
+    public static void CreateSceneFromCommandLine()
+    {
+        CreateScene();
+    }
+
+    public static void CreateScene()
+    {
+        Directory.CreateDirectory("Assets/Scenes/Result");
+
+        Scene previousScene = SceneManager.GetActiveScene();
+        Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        SceneManager.SetActiveScene(scene);
+
+        GameObject eventSystem = new GameObject("EventSystem");
+        eventSystem.AddComponent<EventSystem>();
+        eventSystem.AddComponent<InputSystemUIInputModule>();
+
+        GameObject controllerObject = new GameObject("ResultUIController");
+        ResultUIController controller = controllerObject.AddComponent<ResultUIController>();
+        controller.BuildDefaultUiForEditor();
+        EditorUtility.SetDirty(controller);
+
+        EditorSceneManager.SaveScene(scene, ScenePath);
+        if (previousScene.IsValid() &&
+            previousScene.isLoaded &&
+            previousScene != scene)
+        {
+            SceneManager.SetActiveScene(previousScene);
+        }
+
+        EnsureSceneInBuildSettings();
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
+
+    private static void EnsureSceneInBuildSettings()
+    {
+        EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
+
+        for (int i = 0; i < scenes.Length; i++)
+        {
+            if (scenes[i].path == ScenePath)
+            {
+                scenes[i].enabled = true;
+                EditorBuildSettings.scenes = scenes;
+                return;
+            }
+        }
+
+        EditorBuildSettingsScene[] updated = new EditorBuildSettingsScene[scenes.Length + 1];
+        for (int i = 0; i < scenes.Length; i++)
+        {
+            updated[i] = scenes[i];
+        }
+
+        updated[updated.Length - 1] = new EditorBuildSettingsScene(ScenePath, true);
+        EditorBuildSettings.scenes = updated;
+    }
+}

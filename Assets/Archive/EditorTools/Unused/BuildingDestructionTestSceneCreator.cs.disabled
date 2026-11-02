@@ -1,0 +1,305 @@
+using System.Collections.Generic;
+using System.IO;
+using MyGame;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public static class BuildingDestructionTestSceneCreator
+{
+    private const string ScenePath = "Assets/Scenes/Tests/BuildingDestructionTestScene.unity";
+    private static readonly string[] BuildingAssetPaths =
+    {
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/office_building_4.fbx",
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/factory_building_big.fbx",
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/mid_house_3.fbx",
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/small_house_1.fbx"
+    };
+
+    private static readonly string[] ReadableAssetPaths =
+    {
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/demo_city_by_versatile_studio.fbx",
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/office_building_4.fbx",
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/factory_building_big.fbx",
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/mid_house_3.fbx",
+        "Assets/Versatile Studio Assets/Demo City By Versatile Studio/Models/small_house_1.fbx"
+    };
+
+    [MenuItem("Tools/Cluster Destruction/Create Building Destruction Test Scene")]
+    public static void CreateSceneFromMenu()
+    {
+        CreateScene();
+    }
+
+    [MenuItem("Tools/Cluster Destruction/Validate Building Destruction Test Meshes")]
+    public static void ValidateMeshesFromMenu()
+    {
+        ValidateMeshes();
+    }
+
+    public static void CreateSceneFromCommandLine()
+    {
+        CreateScene();
+    }
+
+    public static void ValidateMeshesFromCommandLine()
+    {
+        bool success = ValidateMeshes();
+        if (!success)
+        {
+            EditorApplication.Exit(1);
+        }
+    }
+
+    public static void CreateScene()
+    {
+        Directory.CreateDirectory("Assets/Scenes/Tests");
+        EnsureBuildingAssetsReadable();
+
+        Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        SceneManager.SetActiveScene(scene);
+
+        CreateLighting();
+        CreateCamera();
+        CreateGround();
+
+        GameObject buildingsRoot = new GameObject("BuildingDestructionTestBuildings");
+
+        for (int i = 0; i < BuildingAssetPaths.Length; i++)
+        {
+            GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(BuildingAssetPaths[i]);
+            if (asset == null)
+            {
+                Debug.LogWarning($"Building test asset not found: {BuildingAssetPaths[i]}");
+                continue;
+            }
+
+            Vector3 position = new Vector3((i - 1.5f) * 8f, 0f, 0f);
+            CreateDestructibleBuilding(asset, buildingsRoot.transform, position, i);
+        }
+
+        GameObject controller = new GameObject("DestructionBuildingTestController");
+        controller.AddComponent<DestructionBuildingTestController>();
+
+        EditorSceneManager.SaveScene(scene, ScenePath);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log($"Created building destruction test scene: {ScenePath}");
+    }
+
+    private static void CreateLighting()
+    {
+        GameObject sun = new GameObject("Directional Light");
+        Light light = sun.AddComponent<Light>();
+        light.type = LightType.Directional;
+        light.intensity = 1.2f;
+        sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+    }
+
+    private static void CreateCamera()
+    {
+        GameObject cameraObject = new GameObject("Main Camera");
+        Camera camera = cameraObject.AddComponent<Camera>();
+        camera.clearFlags = CameraClearFlags.Skybox;
+        camera.fieldOfView = 55f;
+        cameraObject.tag = "MainCamera";
+        cameraObject.transform.position = new Vector3(0f, 8f, -20f);
+        cameraObject.transform.rotation = Quaternion.Euler(22f, 0f, 0f);
+        cameraObject.AddComponent<AudioListener>();
+    }
+
+    private static void CreateGround()
+    {
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        ground.name = "Ground";
+        ground.transform.localScale = new Vector3(6f, 1f, 4f);
+    }
+
+    private static void CreateDestructibleBuilding(
+        GameObject asset,
+        Transform parent,
+        Vector3 position,
+        int index)
+    {
+        GameObject root = new GameObject("DestructibleBuilding_Test_" + asset.name);
+        root.transform.SetParent(parent, false);
+        root.transform.position = position;
+
+        GameObject intact = (GameObject)PrefabUtility.InstantiatePrefab(asset);
+        intact.name = "Intact_" + asset.name;
+        intact.transform.SetParent(root.transform, false);
+        intact.transform.localPosition = Vector3.zero;
+        intact.transform.localRotation = Quaternion.identity;
+        intact.transform.localScale = Vector3.one;
+
+        AddReadableMeshCollider(intact);
+
+        DestructibleBuilding building = root.AddComponent<DestructibleBuilding>();
+        building.Initialize(
+            1f,
+            intact,
+            null,
+            null,
+            2000 + index,
+            20,
+            8f,
+            0.65f,
+            false,
+            4.5f,
+            0.9f,
+            index);
+
+        EditorUtility.SetDirty(root);
+        EditorUtility.SetDirty(building);
+    }
+
+    private static void AddReadableMeshCollider(GameObject root)
+    {
+        MeshFilter meshFilter = root.GetComponentInChildren<MeshFilter>(true);
+        if (meshFilter == null || meshFilter.sharedMesh == null)
+            return;
+
+        if (root.GetComponentInChildren<Collider>(true) != null)
+            return;
+
+        MeshCollider collider = meshFilter.gameObject.AddComponent<MeshCollider>();
+        collider.sharedMesh = meshFilter.sharedMesh;
+        collider.convex = false;
+    }
+
+    private static bool ValidateMeshes()
+    {
+        EnsureBuildingAssetsReadable();
+        bool success = true;
+
+        for (int i = 0; i < BuildingAssetPaths.Length; i++)
+        {
+            GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(BuildingAssetPaths[i]);
+            if (asset == null)
+            {
+                Debug.LogError($"Building destruction validation failed. Missing asset: {BuildingAssetPaths[i]}");
+                success = false;
+                continue;
+            }
+
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(asset);
+            Mesh mesh = MeshCombineUtility.CombineMeshesToLocal(instance);
+            Object.DestroyImmediate(instance);
+
+            if (mesh == null || mesh.vertexCount == 0)
+            {
+                Debug.LogError($"Building destruction validation failed. Combined mesh is empty: {BuildingAssetPaths[i]}");
+                success = false;
+                continue;
+            }
+
+            int voronoiCount = CountVoronoiPieces(mesh, 3000 + i);
+            int sliceCount = 0;
+            if (voronoiCount < 2)
+            {
+                sliceCount = CountSlicePieces(mesh, 4000 + i);
+            }
+
+            bool passed = voronoiCount >= 2 || sliceCount >= 2;
+            Debug.Log(
+                $"Building destruction validation: {Path.GetFileName(BuildingAssetPaths[i])}, " +
+                $"vertices={mesh.vertexCount}, triangles={mesh.triangles.Length / 3}, " +
+                $"voronoiPieces={voronoiCount}, slicePieces={sliceCount}, passed={passed}");
+
+            Object.DestroyImmediate(mesh);
+
+            if (!passed)
+            {
+                success = false;
+            }
+        }
+
+        return success;
+    }
+
+    private static void EnsureBuildingAssetsReadable()
+    {
+        for (int i = 0; i < ReadableAssetPaths.Length; i++)
+        {
+            ModelImporter importer = AssetImporter.GetAtPath(ReadableAssetPaths[i]) as ModelImporter;
+            if (importer == null)
+                continue;
+
+            if (!importer.isReadable)
+            {
+                importer.isReadable = true;
+                importer.SaveAndReimport();
+            }
+            else
+            {
+                AssetDatabase.ImportAsset(ReadableAssetPaths[i], ImportAssetOptions.ForceUpdate);
+            }
+        }
+    }
+
+    private static int CountVoronoiPieces(Mesh mesh, int seed)
+    {
+        VoronoiFractureSettings settings = new VoronoiFractureSettings
+        {
+            qualityPreset = FractureQualityPreset.Custom,
+            seedCount = 20,
+            randomSeed = seed,
+            minPieceVolume = 0.0001f,
+            minAxisSize = 0.03f,
+            minAxisRatio = 0f,
+            maxAspectRatio = 0f,
+            colliderMode = FracturePieceColliderMode.Auto,
+            autoMeshColliderMaxTriangles = 128,
+            autoMeshColliderMinAxisSize = 0.25f,
+            autoMeshColliderMinVolume = 0.02f
+        };
+
+        List<SliceFracturePiece> pieces = VoronoiFractureGenerator.Generate(mesh, settings);
+        int count = pieces?.Count ?? 0;
+        DestroyGeneratedPieces(pieces);
+        return count;
+    }
+
+    private static int CountSlicePieces(Mesh mesh, int seed)
+    {
+        SliceFractureSettings settings = new SliceFractureSettings
+        {
+            qualityPreset = FractureQualityPreset.Custom,
+            sliceCount = 19,
+            randomSeed = seed,
+            angleJitter = 55f,
+            axisBias = Vector3.up,
+            minPieceVolume = 0.0001f,
+            minAxisSize = 0.03f,
+            minAxisRatio = 0f,
+            maxAspectRatio = 0f,
+            maxRetryPerSlice = 32,
+            mergeSmallPieces = true,
+            maxSmallPieceMergePasses = 48,
+            colliderMode = FracturePieceColliderMode.Auto,
+            autoMeshColliderMaxTriangles = 128,
+            autoMeshColliderMinAxisSize = 0.25f,
+            autoMeshColliderMinVolume = 0.02f
+        };
+
+        List<SliceFracturePiece> pieces = SliceFractureGenerator.Generate(mesh, settings);
+        int count = pieces?.Count ?? 0;
+        DestroyGeneratedPieces(pieces);
+        return count;
+    }
+
+    private static void DestroyGeneratedPieces(List<SliceFracturePiece> pieces)
+    {
+        if (pieces == null)
+            return;
+
+        for (int i = 0; i < pieces.Count; i++)
+        {
+            if (pieces[i]?.mesh != null)
+            {
+                Object.DestroyImmediate(pieces[i].mesh);
+            }
+        }
+    }
+}

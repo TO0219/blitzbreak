@@ -1,0 +1,215 @@
+using System;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.Animations;
+using UnityEngine;
+
+namespace MyGame.EditorTools
+{
+    public sealed class TankTrackAnimationSetup : AssetPostprocessor
+    {
+        private const string TrackModelPath = "Assets/Model/TankTrackMotionBase.fbx";
+        private const string TrackControllerPath = "Assets/Animations/TankTrackMove.controller";
+        private const string TrackStateName = "TankTrack_Move";
+
+        private static readonly string[] PreferredClipNames =
+        {
+            "Go",
+            "GO",
+            "Take 001"
+        };
+
+        private static bool s_isConfiguring;
+
+        [InitializeOnLoadMethod]
+        private static void ConfigureOnLoad()
+        {
+            EditorApplication.delayCall += ConfigureTrackAnimation;
+        }
+
+        private void OnPostprocessModel(GameObject gameObject)
+        {
+            if (assetPath == TrackModelPath)
+                EditorApplication.delayCall += ConfigureTrackAnimation;
+        }
+
+        [MenuItem("Tools/MyGame/Setup Tank Track Animation")]
+        public static void ConfigureTrackAnimation()
+        {
+            if (s_isConfiguring)
+                return;
+
+            s_isConfiguring = true;
+
+            try
+            {
+                ConfigureImporter();
+                ConfigureController();
+            }
+            finally
+            {
+                s_isConfiguring = false;
+            }
+        }
+
+        private static void ConfigureImporter()
+        {
+            var importer = AssetImporter.GetAtPath(TrackModelPath) as ModelImporter;
+            if (importer == null)
+                return;
+
+            bool changed = false;
+
+            if (!importer.importAnimation)
+            {
+                importer.importAnimation = true;
+                changed = true;
+            }
+
+            if (!importer.resampleCurves)
+            {
+                importer.resampleCurves = true;
+                changed = true;
+            }
+
+            if (importer.animationWrapMode != WrapMode.Loop)
+            {
+                importer.animationWrapMode = WrapMode.Loop;
+                changed = true;
+            }
+
+            if (importer.animationType != ModelImporterAnimationType.Generic)
+            {
+                importer.animationType = ModelImporterAnimationType.Generic;
+                changed = true;
+            }
+
+            if (importer.animationCompression != ModelImporterAnimationCompression.Off)
+            {
+                importer.animationCompression = ModelImporterAnimationCompression.Off;
+                changed = true;
+            }
+
+            ModelImporterClipAnimation[] clips = importer.clipAnimations;
+            if (clips == null || clips.Length == 0)
+                clips = importer.defaultClipAnimations;
+
+            if (clips != null && clips.Length > 0)
+            {
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    ModelImporterClipAnimation clip = clips[i];
+                    bool clipChanged = false;
+
+                    if (!clip.loopTime)
+                    {
+                        clip.loopTime = true;
+                        clipChanged = true;
+                    }
+
+                    if (clip.loopPose)
+                    {
+                        clip.loopPose = false;
+                        clipChanged = true;
+                    }
+
+                    if (clip.wrapMode != WrapMode.Loop)
+                    {
+                        clip.wrapMode = WrapMode.Loop;
+                        clipChanged = true;
+                    }
+
+                    if (!string.IsNullOrEmpty(clip.name)
+                        && clip.name.Equals("GO", StringComparison.OrdinalIgnoreCase)
+                        && clip.name != "Go")
+                    {
+                        clip.name = "Go";
+                        clipChanged = true;
+                    }
+
+                    if (clipChanged)
+                    {
+                        clips[i] = clip;
+                        changed = true;
+                    }
+                }
+
+                importer.clipAnimations = clips;
+            }
+
+            if (changed)
+                importer.SaveAndReimport();
+        }
+
+        private static void ConfigureController()
+        {
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(TrackControllerPath);
+            if (controller == null)
+                return;
+
+            AnimationClip clip = FindTrackClip();
+            if (clip == null)
+                return;
+
+            AnimatorState state = FindState(controller, TrackStateName);
+            if (state == null)
+                return;
+
+            bool changed = false;
+
+            if (state.motion != clip)
+            {
+                state.motion = clip;
+                changed = true;
+            }
+
+            if (!Mathf.Approximately(state.speed, 1f))
+            {
+                state.speed = 1f;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                EditorUtility.SetDirty(controller);
+                AssetDatabase.SaveAssets();
+            }
+        }
+
+        private static AnimationClip FindTrackClip()
+        {
+            AnimationClip[] clips = AssetDatabase.LoadAllAssetsAtPath(TrackModelPath)
+                .OfType<AnimationClip>()
+                .Where(clip => clip != null && !clip.name.StartsWith("__preview__", StringComparison.Ordinal))
+                .ToArray();
+
+            for (int i = 0; i < PreferredClipNames.Length; i++)
+            {
+                string preferredName = PreferredClipNames[i];
+                AnimationClip clip = clips.FirstOrDefault(candidate =>
+                    candidate.name.Equals(preferredName, StringComparison.OrdinalIgnoreCase));
+
+                if (clip != null)
+                    return clip;
+            }
+
+            return clips.FirstOrDefault();
+        }
+
+        private static AnimatorState FindState(AnimatorController controller, string stateName)
+        {
+            for (int layerIndex = 0; layerIndex < controller.layers.Length; layerIndex++)
+            {
+                ChildAnimatorState[] states = controller.layers[layerIndex].stateMachine.states;
+                for (int stateIndex = 0; stateIndex < states.Length; stateIndex++)
+                {
+                    AnimatorState state = states[stateIndex].state;
+                    if (state != null && state.name == stateName)
+                        return state;
+                }
+            }
+
+            return null;
+        }
+    }
+}
